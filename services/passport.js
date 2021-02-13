@@ -5,6 +5,18 @@ const keys = require('../config/key');
 
 const User = mongoose.model('users');
 
+passport.serializeUser((user, done) => {
+  //引数のuserはUserモデルインスタンス
+  //call serializeUser with the user to generate the identifying piece of info
+  done(null, user.id); //mongoDBにあるidを取得
+});
+passport.deserializeUser((id, done) => {
+  // turn an ID into a mongoose model instance
+  User.findById(id).then(user => {
+    done(null, user);
+  });
+});
+
 passport.use(
   new GoogleStrategy(
     {
@@ -17,9 +29,21 @@ passport.use(
       //   console.log('access token', accessToken); //accessTokenは自動的に期限切れになる
       //   console.log('refresh token', refreshToken); //refreshTokenはaccessTokenをupdateできる
       //   console.log('profile:', profile);
-      new User({
-        googleId: profile.id,
-      }).save();
+      User.findOne({ googleId: profile.id }).then(existingUser => {
+        if (existingUser) {
+          //we already have a record with the given profile ID
+          done(null, existingUser);
+        } else {
+          //we don't have a user record with this ID, make a new record.
+          new User({
+            googleId: profile.id,
+          })
+            .save()
+            .then(user => {
+              done(null, user);
+            });
+        }
+      });
     }
   )
 );
